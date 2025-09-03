@@ -17,15 +17,16 @@ TEST_CASE("Compute S-Map projections")
     const auto ds1 = load_csv("logistic_map.csv");
     const auto lib = TimeSeries(ds1, Kokkos::ALL, 1);
     const auto pred = TimeSeries(ds1, Kokkos::ALL, 1);
-    const auto result =
-        MutableTimeSeries("result", pred.extent(0) - (E - 1) * tau);
+    const auto n_result = pred.extent(0) - (E - 1) * tau;
+    const auto result = MutableTimeSeries("result", n_result);
+    edm::MutableJacobian jacobians("jacobians", n_result, E + 1);
 
     const auto ds2 = load_csv("smap_valid_logistic_map.csv");
     const auto ds2_mirror =
         Kokkos::create_mirror_view_and_copy(HostSpace(), ds2);
 
     for (size_t i = 0; i < thetas.size(); i++) {
-        smap(result, lib, pred, pred, E, tau, Tp, thetas[i]);
+        smap(result, jacobians, lib, pred, pred, E, tau, Tp, thetas[i]);
 
         const auto result_mirror =
             Kokkos::create_mirror_view_and_copy(HostSpace(), result);

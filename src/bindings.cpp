@@ -66,6 +66,17 @@ void copy(py::array_t<float> dst, edm::TimeSeries src)
     Kokkos::fence();
 }
 
+void copy(py::array_t<float> dst, edm::MutableJacobian src)
+{
+    auto buf = dst.request();
+    float *dst_ptr = (float *)buf.ptr;
+
+    Kokkos::View<float **, Kokkos::LayoutRight, Kokkos::HostSpace,
+                 Kokkos::MemoryUnmanaged>
+        dst_view(dst_ptr, dst.shape(0), dst.shape(1));
+    Kokkos::deep_copy(dst_view, src);
+}
+
 int edim(py::array_t<float> ts_arr, int E_max, int tau, int Tp)
 {
     if (ts_arr.ndim() != 1) {
@@ -191,9 +202,10 @@ float eval_simplex(py::array_t<float> lib_arr, py::array_t<float> pred_arr,
     }
 }
 
-py::array_t<float> smap(py::array_t<float> lib_arr, py::array_t<float> pred_arr,
-                        py::array_t<float> target_arr, int E, int tau, int Tp,
-                        float theta)
+// Return a py::tuple to send multiple numpy arrays back to Python
+py::tuple smap(py::array_t<float> lib_arr, py::array_t<float> pred_arr,
+                  py::array_t<float> target_arr, int E, int tau, int Tp,
+                  float theta)
 {
     if (lib_arr.ndim() != 1 || pred_arr.ndim() != 1) {
         throw std::invalid_argument("lib and pred must be 1D arrays");
@@ -213,60 +225,66 @@ py::array_t<float> smap(py::array_t<float> lib_arr, py::array_t<float> pred_arr,
     const auto n_target = target_arr.shape(0);
     const auto n_result = n_pred - (E - 1) * tau;
 
+    // Allocate memory for C++ Kokkos Views
     edm::MutableTimeSeries lib("lib", n_lib);
     edm::MutableTimeSeries pred("pred", n_pred);
     edm::MutableTimeSeries target("target", n_target);
     edm::MutableTimeSeries result("result", n_result);
 
+    // --- MODIFICATION 1: Allocate memory for the Jacobians ---
+    edm::MutableJacobian jacobians("jacobians", n_result, E + 1);
+
+    // Copy data from Python numpy arrays to C++ Kokkos Views
     copy(lib, lib_arr);
     copy(pred, pred_arr);
     copy(target, target_arr);
 
-    edm::smap(result, lib, pred, target, E, tau, Tp, theta);
+    // --- MODIFICATION 2: Call the updated edm::smap function ---
+    // Pass the jacobians view to the core C++ function
+    edm::smap(result, jacobians, lib, pred, target, E, tau, Tp, theta);
 
+    // Create Python numpy arrays for the return values
     py::array_t<float> result_arr(n_result);
 
-    copy(result_arr, result);
+    // --- MODIFICATION 3: Create a numpy array for the Jacobians ---
+    py::array_t<float> jacobians_arr({(long int)n_result, (long int)E + 1});
 
-    return result_arr;
+    // Copy data from C++ back to Python numpy arrays
+    copy(result_arr, result);
+    copy(jacobians_arr, jacobians); // Copy the jacobian data
+
+    // --- MODIFICATION 4: Return both arrays as a tuple ---
+    return py::make_tuple(result_arr, jacobians_arr);
 }
 
 float eval_smap(py::array_t<float> lib_arr, py::array_t<float> pred_arr,
                 py::array_t<float> target_arr, int E, int tau, int Tp,
                 float theta)
 {
-    if (lib_arr.ndim() != 1 || pred_arr.ndim() != 1) {
-        throw std::invalid_argument("lib and pred must be 1D arrays");
-    } else if (target_arr.ndim() > 1) {
-        throw std::invalid_argument("target must be a 1D array");
-    }
+    // Call the smap function which returns a (prediction, jacobians) tuple
+    auto result_tuple = smap(lib_arr, pred_arr, target_arr, E, tau, Tp, theta);
+
+    // Extract the prediction array from the tuple
+    auto pred = result_tuple.cast<py::array_t<float>>();
 
     if (target_arr.ndim() == 0) {
-        target_arr = pred_arr;
-    } else if (lib_arr.shape(0) != target_arr.shape(0)) {
-        throw std::invalid_argument(
-            "lib and target must have same number of time steps");
+        target_arr = lib_arr;
     }
 
-    const auto n_lib = lib_arr.shape(0);
-    const auto n_pred = pred_arr.shape(0);
-    const auto n_target = target_arr.shape(0);
-    const auto n_result = n_pred - (E - 1) * tau;
+    const int n_partial = (E - 1) * tau;
+    const int n_pred_smap = pred.shape(0);
 
-    edm::MutableTimeSeries lib("lib", n_lib);
-    edm::MutableTimeSeries pred("pred", n_pred);
-    edm::MutableTimeSeries target("target", n_target);
-    edm::MutableTimeSeries result("result", n_result);
+    edm::MutableTimeSeries p("p", n_pred_smap);
+    edm::MutableTimeSeries t("t", target_arr.shape(0));
 
-    copy(lib, lib_arr);
-    copy(pred, pred_arr);
-    copy(target, target_arr);
+    copy(p, pred);
+    copy(t, target_arr);
 
-    edm::smap(result, lib, pred, target, E, tau, Tp, theta);
-
-    const auto range = std::make_pair((E - 1) * tau + Tp, target.extent_int(0));
-    return edm::corrcoef(Kokkos::subview(target, range), result);
+    // Use the corrected function name and argument types
+    return edm::corrcoef(
+        p, Kokkos::subview(t, std::make_pair(n_partial + Tp, t.extent_int(0))));
 }
+
 
 std::vector<float> ccm(py::array_t<float> lib_arr,
                        py::array_t<float> target_arr,

@@ -6,7 +6,7 @@
 namespace edm
 {
 
-void smap(MutableTimeSeries result, TimeSeries lib, TimeSeries pred,
+void smap(MutableTimeSeries result, MutableJacobian jacobians, TimeSeries lib, TimeSeries pred,
           TimeSeries target, int E, int tau, int Tp, float theta);
 
 } // namespace edm

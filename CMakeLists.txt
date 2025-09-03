@@ -106,7 +106,7 @@ if(KEDM_ENABLE_MPI)
 endif()
 
 # Executables
-option(KEDM_ENABLE_EXECUTABLES "Build executables" ON)
+option(KEDM_ENABLE_EXECUTABLES "Build executables" OFF)
 if(KEDM_ENABLE_EXECUTABLES)
   # HighFive
   set(HIGHFIVE_USE_BOOST OFF CACHE BOOL "")
@@ -167,7 +167,7 @@ if(KEDM_ENABLE_SIMD_PRIMITIVES)
 endif()
 
 # Python bindings
-option(KEDM_ENABLE_PYTHON "Build Python bindings")
+option(KEDM_ENABLE_PYTHON "Build Python bindings" ON)
 if(KEDM_ENABLE_PYTHON)
   # pybind11
   FetchContent_Declare(

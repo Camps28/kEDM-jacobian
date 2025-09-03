@@ -34,8 +34,9 @@ void sgels_(char const *trans, int const *m, int const *n, int const *nrhs,
 namespace edm
 {
 
-void smap(MutableTimeSeries result, TimeSeries lib, TimeSeries pred,
+void smap(MutableTimeSeries result, MutableJacobian jacobians, TimeSeries lib, TimeSeries pred,
           TimeSeries target, int E, int tau, int Tp, float theta)
+
 {
     const int n_partial = (E - 1) * tau;
     const int n_lib = lib.extent(0) - n_partial - Tp;
@@ -165,7 +166,13 @@ void smap(MutableTimeSeries result, TimeSeries lib, TimeSeries pred,
                                      std::to_string(info));
         }
 #endif
-
+        Kokkos::parallel_for(
+            "EDM::smap::capture_jacobians", this_batch_size, KOKKOS_LAMBDA(int i) {
+                for (int k = 0; k < E + 1; k++) {
+                // The coefficients are in the first E+1 rows of the b matrix
+                jacobians(i + offset, k) = b(k, i);
+                }
+            });
         Kokkos::parallel_for(
             "EDM::smap::postprocess", this_batch_size, KOKKOS_LAMBDA(int i) {
                 float p = b(0, i);

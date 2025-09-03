@@ -15,6 +15,7 @@ using MutableDataset = Kokkos::View<float **, Kokkos::LayoutLeft, DevSpace>;
 
 using TimeSeries = Kokkos::View<const float *, Kokkos::LayoutLeft, DevSpace>;
 using MutableTimeSeries = Kokkos::View<float *, Kokkos::LayoutLeft, DevSpace>;
+using MutableJacobian = Kokkos::View<float **, Kokkos::LayoutLeft, DevSpace>;
 
 // Used in lookup
 using ScratchTimeSeries =

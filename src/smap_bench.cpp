@@ -57,7 +57,11 @@ int main(int argc, char *argv[])
 
     edm::MutableTimeSeries lib("lib", L);
     edm::MutableTimeSeries pred("pred", L);
-    edm::MutableTimeSeries result("result", L);
+
+    // Correctly size the result and jacobian views
+    const auto n_result = L - (E - 1) * tau;
+    edm::MutableTimeSeries result("result", n_result);
+    edm::MutableJacobian jacobians("jacobians", n_result, E + 1);
 
     auto lib_mirror = Kokkos::create_mirror_view(lib);
     auto pred_mirror = Kokkos::create_mirror_view(pred);
@@ -79,7 +83,7 @@ int main(int argc, char *argv[])
     Kokkos::Timer timer;
 
     for (auto i = 0; i < iterations; i++) {
-        edm::smap(result, lib, pred, lib, E, tau, Tp, theta);
+        edm::smap(result, jacobians, lib, pred, lib, E, tau, Tp, theta);
     }
 
     Kokkos::fence();
