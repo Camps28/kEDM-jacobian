@@ -1,3 +1,7 @@
+## Custom Modifications: Jacobian Extraction
+
+This fork of kEDM adds the feature to extract local Jacobian matrices from the S-map function.
+
 # kEDM
 
 [![build](https://github.com/keichi/kEDM/workflows/build/badge.svg)](https://github.com/keichi/kEDM/actions?query=workflow%3Abuild) [![Documentation Status](https://readthedocs.org/projects/kedm/badge/?version=latest)](https://kedm.readthedocs.io/en/latest/?badge=latest) [![PyPI version](https://badge.fury.io/py/kedm.svg)](https://badge.fury.io/py/kedm)
